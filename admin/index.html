@@ -955,7 +955,7 @@ textarea.fb-input{resize:vertical}
 <div id="shell">
   <div id="update-banner">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg> <span id="update-msg">A new version of Fourge is available.</span>
-    <button class="btn btn-amber btn-sm" onclick="doUpdate()" id="update-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Update Now</button>
+    <button class="btn btn-amber btn-sm" onclick="doUpdateAndReload(this)" id="update-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Update Now</button>
     <button class="ib" onclick="dismissUpdate()" style="color:rgba(255,255,255,.6);margin-left:auto"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
 
@@ -1169,9 +1169,9 @@ textarea.fb-input{resize:vertical}
           <button class="fd-btn-secondary" id="ve-redo-btn" onclick="veRedo()" disabled title="Redo (Ctrl+Shift+Z)">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 014-4h12"/></svg>
           </button>
-          <button class="fd-btn-secondary" onclick="veAiPageModal()" title="AI Page Edit" id="tb-ai-edit" data-perm="aiEdit">
+          <button class="fd-btn-secondary" onclick="veAiPageModal()" title="General Markup" id="tb-ai-edit" data-perm="aiEdit">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-            AI Edit
+            General Markup
           </button>
           <button class="fd-btn-secondary" onclick="veCleanAllPages()" title="Strip stale editor attributes from all saved pages (fixes wrong-block image bug on old saves)">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 001.3 1.3L21 12l-5.8 1.9a2 2 0 00-1.3 1.3L12 21l-1.9-5.8a2 2 0 00-1.3-1.3L3 12l5.8-1.9a2 2 0 001.3-1.3z"/></svg>
@@ -1549,18 +1549,19 @@ textarea.fb-input{resize:vertical}
           <div class="fr"><div class="fg"><label>From Address</label><input type="text" id="s-mg-from" placeholder="postmaster@mg.example.com"></div><div class="fg"><label>Notify Email</label><input type="text" id="s-mg-notify" placeholder="client@example.com"></div></div>
           <button class="fd-btn-primary" onclick="saveMailgunCfg()">Save Mailgun</button>
         </div>
-        <div class="si-sec architect-only"><h2>Claude API Key</h2><div class="desc">Used for AI-powered SEO generation and block extraction. Visible to the Architect account only.</div>
+        <div class="si-sec architect-only"><h2>Markup API Key</h2><div class="desc">Powers Markup generation (SEO + block extraction). Visible to the Architect account only.</div>
           <div class="fg"><label>API Key</label><input type="password" id="s-claude" placeholder="sk-ant-…"></div>
           <button class="fd-btn-primary" onclick="saveClaudeKey()">Save</button>
         </div>
-        <div class="si-sec"><h2>Auto-Update</h2><div class="desc">Fourge checks for updates daily against your template repo.</div>
-          <div class="fg"><label>Template Repo</label><input type="text" id="s-tpl-repo" placeholder="scottecklund/foundry-template"></div>
+        <div class="si-sec"><h2>Auto-Update</h2><div class="desc">This site pulls CMS updates from the Fourge repository. Checked about once a day, after login.</div>
+          <div class="fg"><label>CMS Repo</label><input type="text" id="s-tpl-repo" placeholder="scottecklund/foundrycms"></div>
           <div class="fg"><label>Update Mode</label>
             <select id="s-update-mode" style="width:100%">
-              <option value="manual">Manual — ask me at login</option>
-              <option value="auto">Automatic — apply at login</option>
+              <option value="notify">Notify — check daily, ask before installing</option>
+              <option value="auto">Automatic — install updates at login</option>
+              <option value="off">Off — only when I click “Check Now”</option>
             </select>
-            <div class="desc" style="margin-top:4px">Checked after login against the repo's <code>version.json</code>. Only <code>index.html</code> is updated; <code>api.php</code> (your keys) is never touched.</div>
+            <div class="desc" style="margin-top:4px">Updates the CMS engine files (<code>index.html</code>, <code>db.php</code>, page renderers). <code>api.php</code> (this site's API token + Mailgun keys) is never touched — if a release changes it, update it by hand. Private repos need the GitHub PAT set above.</div>
           </div>
           <div style="display:flex;gap:8px"><button class="fd-btn-primary" onclick="saveTplRepo()">Save</button><button class="fd-btn-secondary" onclick="checkForUpdates()">Check Now</button></div>
         </div>
@@ -1582,7 +1583,7 @@ textarea.fb-input{resize:vertical}
               <div class="fd-toggle" id="perm-toggle-seo" onclick="toggleEditorPerm('seo',this)"><div class="fd-toggle-knob"></div></div>
             </label>
             <label style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;gap:16px">
-              <div><div style="font-size:13px;font-weight:600;color:var(--text)">AI Edit (Page Editor)</div><div style="font-size:11px;color:var(--muted);margin-top:2px">AI rewrite toolbar button in the visual editor</div></div>
+              <div><div style="font-size:13px;font-weight:600;color:var(--text)">General Markup (Page Editor)</div><div style="font-size:11px;color:var(--muted);margin-top:2px">Markup button in the visual editor toolbar</div></div>
               <div class="fd-toggle" id="perm-toggle-aiEdit" onclick="toggleEditorPerm('aiEdit',this)"><div class="fd-toggle-knob"></div></div>
             </label>
             <label style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;gap:16px">
@@ -1838,7 +1839,14 @@ function sha256(message){
 }
 
 
-const CMS_VERSION='1.2.0';
+const CMS_VERSION='1.3.0';
+// Engine files the self-updater is allowed to pull from the CMS repo.
+// These hold NO per-site data or secrets. api.php is deliberately excluded
+// (it carries this site's API token + Mailgun keys) — it stays a manual update.
+// This must mirror the server allow-list in api.php → fourgeUpdateFetchAllow().
+const UPDATE_FILES_ALLOWED=['admin/index.html','admin/db.php','block-renderer.jsx','blog-post.jsx','interior-shell.jsx','posts.jsx','preview.html'];
+const UPDATE_FILES_DEFAULT=UPDATE_FILES_ALLOWED.slice(); // used when version.json omits "files"
+const UPDATE_THROTTLE_MS=20*60*60*1000; // ~daily: don't re-check on every login within a day
 const F_PAGES='data/pages.json',F_POSTS='data/posts.json',F_SEO='data/seo.json';
 const F_SITE='data/site.json',F_INJECT='data/injections.json',F_USERS='data/users.json';
 const DIR_ASSETS='assets/';
@@ -2015,7 +2023,7 @@ const EDITOR_MODULES = [
   {key:'tlp',         label:'Targeted Landing Pages', desc:'Generate city-targeted landing pages'},
   {key:'media',       label:'Media Library',    desc:'Upload and manage media files'},
   {key:'seo',         label:'SEO Panel',        desc:'Manage meta titles, descriptions, and SEO settings'},
-  {key:'aiEdit',      label:'AI Edit',          desc:'AI rewrite button in the page editor toolbar'},
+  {key:'aiEdit',      label:'General Markup',   desc:'Markup tools in the page editor toolbar'},
   {key:'revisions',   label:'Revisions',        desc:'View history and restore previous page versions'},
   {key:'siteFactory', label:'Site Factory',     desc:'Import pages and scan server structure'},
   {key:'design',      label:'Design / Site Info',desc:'Edit site-wide design and information'},
@@ -2149,8 +2157,10 @@ async function initApp(){
 }
 
 // Runs at the tail of post-login init while the loader is still up.
-// Shows "Checking for updates…" status; if an update exists, either
-// auto-applies (mode=auto) or prompts Update/Skip (mode=manual).
+// Respects the update mode: 'off' skips entirely, 'notify' checks daily and
+// asks before installing, 'auto' checks daily and installs. The check is
+// throttled to ~once a day (see updateCheckDue); "Check Now" in Settings
+// bypasses both the throttle and the mode.
 async function initUpdateGate(){
   // Ensure site-wide config is loaded before reading update settings,
   // so a fresh device/browser still sees the repo + mode from site.json.
@@ -2162,24 +2172,27 @@ async function initUpdateGate(){
     }catch{}
   }
   const tpl=getTplRepo();
-  if(!tpl) return; // no repo configured → nothing to check
-  window.__fxHold=true; // keep the loader up until we resolve
-  try{ await _updateGateInner(); } finally { window.__fxHold=false; }
+  if(!tpl) return;                 // no repo configured → nothing to check
+  const mode=getUpdateMode();
+  if(mode==='off') return;         // updates disabled (Check Now still works)
+  if(!updateCheckDue()) return;    // already checked within the daily window
+  window.__fxHold=true;            // keep the loader up until we resolve
+  try{ await _updateGateInner(mode); } finally { window.__fxHold=false; }
 }
-async function _updateGateInner(){
+async function _updateGateInner(mode){
   const status=document.getElementById('fxl-status');
   const setStatus=(t)=>{ if(status){ status.textContent=t; if(window.fxScramble) fxScramble(status); } };
   let st;
   try{
     setStatus('CHECKING FOR UPDATES');
     st=await getUpdateStatus();
-  }catch(e){ return; } // network/parse fail → don't block login
+    markUpdateChecked(); // record the daily check (success only)
+  }catch(e){ return; } // network/parse fail → don't block login, retry next login
   if(!st.available) return;
 
-  const mode=getUpdateMode();
   if(mode==='auto'){
     setStatus('UPDATING FOURGE');
-    const ok=await doUpdate();
+    const ok=await doUpdate(st);
     if(ok){
       setStatus('UPDATED — RELOADING');
       await new Promise(r=>setTimeout(r,900));
@@ -2189,13 +2202,13 @@ async function _updateGateInner(){
     return; // failed → continue into CMS on current version
   }
 
-  // Manual mode: pause and ask. Returns a promise that resolves when the
-  // user picks, so the loader doesn't complete until they decide.
+  // 'notify': pause and ask. Returns a promise that resolves when the user
+  // picks, so the loader doesn't complete until they decide.
   return new Promise((resolve)=>{
     showUpdatePrompt(st.remote.version, st.local, async (choice)=>{
       if(choice==='update'){
         setStatus('UPDATING FOURGE');
-        const ok=await doUpdate();
+        const ok=await doUpdate(st);
         if(ok){ setStatus('UPDATED — RELOADING'); await new Promise(r=>setTimeout(r,900)); location.reload(); return; }
         resolve(); // failed → proceed on current version
       } else {
@@ -2778,7 +2791,7 @@ async function generateTLPs(){
   if(!cities.length){ toast('Enter at least one city (one per line)','err'); return; }
   const selected=Array.from(document.querySelectorAll('.tlp-src-chk:checked')).map(c=>c.value);
   if(!selected.length){ toast('Select at least one page','err'); return; }
-  try{ if(!getEffectivePerms(getSessionUser()).aiEdit){ toast('Your account does not have AI editing enabled','err'); return; } }catch(e){}
+  try{ if(!getEffectivePerms(getSessionUser()).aiEdit){ toast('Markup editing is not enabled for your account','err'); return; } }catch(e){}
   const apiKey='';
 
   const out=document.getElementById('tlp-preview-area');
@@ -4329,8 +4342,18 @@ async function deleteUser(){
 // Update config is SITE-WIDE: stored in data/site.json (_site.update),
 // so every device/user that loads this site sees the same repo + mode.
 function getUpdateCfg(){return (_site&&_site.update)||{};}
-function getTplRepo(){const u=getUpdateCfg();return (u.repo||localStorage.getItem('cd_tpl_repo')||'');}
-function getUpdateMode(){const u=getUpdateCfg();return (u.mode||localStorage.getItem('cd_update_mode')||'manual');} // 'auto' | 'manual'
+// Default to the canonical CMS repo so a freshly-deployed site can pull updates
+// out of the box. A site can override this in Settings → Auto-Update.
+const DEFAULT_TPL_REPO='scottecklund/foundrycms';
+function getTplRepo(){const u=getUpdateCfg();return (u.repo||localStorage.getItem('cd_tpl_repo')||DEFAULT_TPL_REPO);}
+// Modes: 'off' (only "Check Now"), 'notify' (daily check + ask before installing),
+// 'auto' (daily check + install at login). Legacy 'manual' maps to 'notify'.
+function getUpdateMode(){
+  const u=getUpdateCfg();
+  let m=(u.mode||localStorage.getItem('cd_update_mode')||'notify');
+  if(m==='manual') m='notify';
+  return (m==='off'||m==='auto'||m==='notify')?m:'notify';
+}
 
 // Real semantic-version compare. Returns 1 if a>b, -1 if a<b, 0 equal.
 function semverCmp(a,b){
@@ -4344,19 +4367,45 @@ function semverCmp(a,b){
   return 0;
 }
 
-// Read version.json from the PUBLIC repo via raw.githubusercontent (no token).
-// tpl is "owner/repo" (optionally "owner/repo@branch"); defaults to main.
+// Split "owner/repo" or "owner/repo@branch" into {repo, branch}.
+function parseTplRepo(tpl){
+  let repo=tpl, branch='main';
+  if(tpl.includes('@')){ const p=tpl.split('@'); repo=p[0]; branch=p[1]||'main'; }
+  return {repo, branch};
+}
+
+// Fetch one engine file from the CMS repo as text.
+//  • PUBLIC repos resolve over raw.githubusercontent with no auth.
+//  • PRIVATE repos return 404/403 there, so we fall back to the server, which
+//    re-fetches with the stored GitHub PAT (see api.php → repo_fetch).
+async function fetchRepoFile(repo, branch, path){
+  // 1) public, tokenless
+  try{
+    const u=`https://raw.githubusercontent.com/${repo}/${branch}/${path}?t=${Date.now()}`;
+    const r=await fetch(u,{cache:'no-store'});
+    if(r.ok) return await r.text();
+    if(r.status!==404 && r.status!==403) throw new Error(path+' HTTP '+r.status);
+  }catch(e){ /* network/CORS or private → try the server */ }
+  // 2) server-side (handles private repos via the PAT). Needs a session/token.
+  if(canCallApi()){
+    const d=await apiCall('repo_fetch',{repo,branch,path});
+    if(d && typeof d.content==='string') return d.content;
+  }
+  throw new Error('Could not fetch '+path+' (private repo without a server PAT?)');
+}
+
+// Read version.json from the CMS repo. tpl is "owner/repo" (optionally
+// "owner/repo@branch"); defaults to main. Returns the parsed marker incl.
+// the optional "files" manifest the updater should pull.
 async function fetchRemoteVersion(){
   const tpl=getTplRepo();
   if(!tpl) return null;
-  let repo=tpl, branch='main';
-  if(tpl.includes('@')){ const p=tpl.split('@'); repo=p[0]; branch=p[1]||'main'; }
-  const url=`https://raw.githubusercontent.com/${repo}/${branch}/admin/version.json?t=${Date.now()}`;
-  const res=await fetch(url,{cache:'no-store'});
-  if(!res.ok) throw new Error('version.json HTTP '+res.status);
-  const j=await res.json();
+  const{repo,branch}=parseTplRepo(tpl);
+  const txt=await fetchRepoFile(repo,branch,'admin/version.json');
+  const j=JSON.parse(txt);
   if(!j.version) throw new Error('version.json missing "version"');
-  return {version:String(j.version), branch, repo, notes:j.notes||''};
+  const files=Array.isArray(j.files)&&j.files.length?j.files:UPDATE_FILES_DEFAULT.slice();
+  return {version:String(j.version), branch, repo, notes:j.notes||'', files, apiManual:!!j.apiManual, apiNote:j.apiNote||''};
 }
 
 // Returns {available:bool, remote, local} — does NOT touch UI. Safe to call anywhere.
@@ -4367,10 +4416,20 @@ async function getUpdateStatus(){
   return {available: semverCmp(remote.version, local)>0, remote, local};
 }
 
-// Legacy banner-style check (used by "Check Now" button in Settings).
+// ── Daily-check throttle ─────────────────────────────────────────
+// The login gate checks at most once per UPDATE_THROTTLE_MS so we don't hit the
+// repo on every page load. "Check Now" bypasses this entirely.
+function updateCheckDue(){
+  const last=parseInt(localStorage.getItem('cd_last_update_check')||'0',10);
+  return !last || (Date.now()-last)>UPDATE_THROTTLE_MS;
+}
+function markUpdateChecked(){ localStorage.setItem('cd_last_update_check',String(Date.now())); }
+
+// Banner-style check (used by the "Check Now" button in Settings). Always runs.
 async function checkForUpdates(){
   try{
     const st=await getUpdateStatus();
+    markUpdateChecked();
     if(st.available){
       const banner=document.getElementById('update-banner');
       const msg=document.getElementById('update-msg');
@@ -4383,27 +4442,48 @@ async function checkForUpdates(){
   }catch(e){ toast('Update check failed: '+e.message,'err'); }
 }
 
-// Pull index.html from the PUBLIC repo (read-only) and write it to THIS
-// server via api.php. Never touches api.php (it holds per-site secrets).
-async function doUpdate(){
+// Pull the CMS engine files from the repo (read-only) and write them back to
+// THIS server via api.php. The file set comes from version.json's "files"
+// manifest, hard-filtered to UPDATE_FILES_ALLOWED — so api.php (this site's
+// secrets) and any site data can NEVER be overwritten by an update.
+// Pass the status object from getUpdateStatus() to reuse its manifest; omit to
+// resolve a fresh one. index.html is written LAST so the entry point never runs
+// ahead of the data layer it depends on.
+async function doUpdate(st){
   const tpl=getTplRepo();
-  if(!tpl){ toast('Set Template Repo in Settings first','err'); return false; }
-  const{url,token}=getApiCfg();
-  if(!url||!token){ toast('Server API not configured — cannot write update','err'); return false; }
-  let repo=tpl, branch='main';
-  if(tpl.includes('@')){ const p=tpl.split('@'); repo=p[0]; branch=p[1]||'main'; }
+  if(!tpl){ toast('Set the CMS Repo in Settings first','err'); return false; }
+  if(!canCallApi()){ toast('Sign in again to install updates','err'); return false; }
   try{
-    const rawUrl=`https://raw.githubusercontent.com/${repo}/${branch}/admin/index.html?t=${Date.now()}`;
-    const res=await fetch(rawUrl,{cache:'no-store'});
-    if(!res.ok) throw new Error('index.html HTTP '+res.status);
-    const html=await res.text();
-    if(html.length<10000 || html.indexOf('CMS_VERSION')<0) throw new Error('Downloaded file looks invalid');
-    // Write to the live admin file on the server. api.php is NOT updated.
-    await apiCall('write_file',{path:'admin/index.html',content:html});
+    if(!st || !st.remote) st=await getUpdateStatus();
+    const remote=st.remote||{};
+    const repo=remote.repo, branch=remote.branch||'main';
+    if(!repo) throw new Error('Could not resolve update source');
+    // Authoritative file set = version.json manifest ∩ the allow-list.
+    let files=(Array.isArray(remote.files)&&remote.files.length?remote.files:UPDATE_FILES_DEFAULT)
+                .filter(f=>UPDATE_FILES_ALLOWED.includes(f));
+    if(!files.length) files=UPDATE_FILES_DEFAULT.slice();
+    // 1) Download everything first so a mid-way failure leaves nothing written.
+    const blobs={};
+    for(const f of files){ blobs[f]=await fetchRepoFile(repo,branch,f); }
+    // Sanity-check the big one before we commit any writes.
+    const html=blobs['admin/index.html'];
+    if(html!=null && (html.length<10000 || html.indexOf('CMS_VERSION')<0))
+      throw new Error('Downloaded index.html looks invalid — aborting');
+    // 2) Write engine files, index.html last.
+    const order=files.slice().sort((a,b)=> a==='admin/index.html'?1 : (b==='admin/index.html'?-1:0));
+    for(const f of order){ await apiCall('write_file',{path:f,content:blobs[f]}); }
     return true;
   }catch(e){ toast('Update failed: '+e.message,'err'); return false; }
 }
 
+// Banner "Update Now" → run the multi-file update, then reload on success so
+// the freshly-written index.html takes over.
+async function doUpdateAndReload(btn){
+  if(btn){ btn.disabled=true; btn.dataset._t=btn.textContent; btn.textContent='Updating…'; }
+  const ok=await doUpdate();
+  if(ok){ toast('Updated — reloading','ok'); await new Promise(r=>setTimeout(r,700)); location.reload(); return; }
+  if(btn){ btn.disabled=false; btn.textContent=btn.dataset._t||'Update Now'; }
+}
 function dismissUpdate(){const b=document.getElementById('update-banner');if(b)b.classList.remove('show');}
 
 // ── PAGE/BLOCK EDITOR (stubs for new visual editor compat) ───────
@@ -4487,23 +4567,67 @@ function getPageList(){
   }));
 }
 
+// Derive a stable page id from a relative path. MUST match the Site Factory
+// import scheme so a scanned file and its imported counterpart share one entry
+// (e.g. index.html → "home", about/index.html → "about-index").
+function pageIdFromPath(relPath){
+  const raw=String(relPath||'').replace(/\.html?$/i,'').toLowerCase().replace(/[\/]/g,'-').replace(/[^a-z0-9-]/g,'');
+  return raw==='index'?'home':(raw||'page');
+}
+
 async function loadPages(){
-  // 1. Try reading pages.json directly from server (works without GitHub)
+  // Build the page list FROM THE SERVER so it's identical for every user/browser
+  // and nobody has to "scan" manually:
+  //   1. data/pages.json → saved per-page CMS data (blocks/CSS) for edited pages
+  //   2. list_pages       → authoritative scan of every .html page on the server
+  // Merged with saved data winning. Because the list is derived from the files
+  // that physically exist, it survives an empty or freshly-redeployed pages.json.
+
+  // 1. Saved per-page data (may legitimately be {} on a fresh/redeployed site)
+  let saved={};
   try{
     const res=await fetch('../data/pages.json?t='+Date.now());
-    if(res.ok){const data=await res.json();if(Object.keys(data).length){_pages=data;return;}}
+    if(res.ok){ const d=await res.json(); if(d&&typeof d==='object'&&!Array.isArray(d)) saved=d; }
   }catch{}
-  // 2. Try api.php read_file
-  const{url,token}=getApiCfg();
-  if(url&&token){
-    try{
-      const d=await apiCall('read_file',{path:'data/pages.json'});
-      if(d.content){const data=JSON.parse(d.content);if(Object.keys(data).length){_pages=data;return;}}
-    }catch{}
+  if(!Object.keys(saved).length && canCallApi()){
+    try{ const d=await apiCall('read_file',{path:'data/pages.json'}); if(d.content){ const j=JSON.parse(d.content); if(j&&typeof j==='object'&&!Array.isArray(j)) saved=j; } }catch{}
   }
-  // 3. Fall back to GitHub
-  try{const{content:c,sha}=await ghRead(F_PAGES);_pages=JSON.parse(c);_pagesSHA=sha;}
-  catch{}
+
+  // 2. Authoritative server-side scan of the pages that actually exist
+  let scanned=[];
+  if(canCallApi()){
+    try{ const d=await apiCall('list_pages'); if(d&&Array.isArray(d.pages)) scanned=d.pages; }
+    catch(e){ console.warn('list_pages failed:',e.message); }
+  }
+
+  // 3. Merge: saved entries keep their blocks/CSS; files not yet edited get a
+  //    light entry the visual editor opens directly (it reads the HTML itself).
+  const merged={...saved};
+  // Track paths/files already represented by a saved entry so a scanned file
+  // whose id-scheme differs (e.g. a CMS-created page) doesn't become a duplicate.
+  const seen=new Set();
+  for(const k in saved){
+    [saved[k]?.path, saved[k]?.file].forEach(v=>{ if(v) seen.add(String(v).toLowerCase()); });
+  }
+  for(const sp of scanned){
+    if(!sp || !veIsSafePath(sp.path)) continue;
+    if(seen.has(String(sp.path||'').toLowerCase()) || seen.has(String(sp.file||'').toLowerCase())) continue;
+    const id=pageIdFromPath(sp.path);
+    if(merged[id]){
+      if(!merged[id].path)  merged[id].path  = sp.path;
+      if(!merged[id].file)  merged[id].file  = sp.file;
+      if(!merged[id].title) merged[id].title = sp.title;
+    } else {
+      merged[id]={ title: sp.title||capitalize(id), file: sp.file, path: sp.path };
+    }
+  }
+
+  // 4. Last resort (no server API reachable at all): GitHub copy of pages.json
+  if(!Object.keys(merged).length){
+    try{ const{content:c,sha}=await ghRead(F_PAGES); const j=JSON.parse(c); if(j&&typeof j==='object'){ Object.assign(merged,j); _pagesSHA=sha; } }catch{}
+  }
+
+  _pages=merged;
 }
 
 // ── INIT ────────────────────────────────────────────────────────
@@ -4517,7 +4641,7 @@ async function initPages(){
     renderVePageList();
     veLoadPage(autoId);
   } else {
-    veShowEmpty('No pages yet. Use Site Factory to import your pages.');
+    veShowEmpty('No pages found on the server. Upload your .html files (cPanel or FTP) and they appear here automatically — no import needed.');
   }
 }
 
@@ -4527,7 +4651,7 @@ function renderVePageList(){
   const el=document.getElementById('ve-page-items');
   if(!el)return;
   if(!pages.length){
-    el.innerHTML='<div style="padding:16px;text-align:center;font-size:12px;color:var(--muted)">No pages yet.<br>Use Site Factory to import.</div>';
+    el.innerHTML='<div style="padding:16px;text-align:center;font-size:12px;color:var(--muted)">No pages found.<br>Upload .html files and<br>they appear automatically.</div>';
     return;
   }
   el.innerHTML=pages.map(p=>`
@@ -5346,7 +5470,6 @@ function veAiPanel(){
   try{ const p=getEffectivePerms(getSessionUser()); if(!p.aiEdit) return ''; }catch(e){}
   return '<div class="ve-ai-bar">'
     + '<div class="ve-ai-divider"><span>Markup</span></div>'
-    + '<div class="desc" style="margin:-2px 0 8px">Describe a change to this element in plain English \u2014 e.g. "make this 200px wide and center it", "change to navy and bigger", "add more padding".</div>'
     + '<textarea class="ve-ai-prompt" id="vp-ai-prompt" placeholder="Describe the change to this element\u2026"></textarea>'
     + '<button class="ve-apply-btn ve-ai-btn" onclick="veAiEdit()">'
     + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>'
@@ -5636,7 +5759,7 @@ function veAiDiscard(){
 
 // ── PAGE-LEVEL AI ────────────────────────────────────────────────
 function veAiPageModal(){
-  try{ if(!getEffectivePerms(getSessionUser()).aiEdit){ toast('Your account does not have AI editing enabled','err'); return; } }catch(e){}
+  try{ if(!getEffectivePerms(getSessionUser()).aiEdit){ toast('Markup editing is not enabled for your account','err'); return; } }catch(e){}
   const apiKey = '';
   // Build and show modal
   let modal = document.getElementById('ve-ai-page-modal');
@@ -5649,14 +5772,14 @@ function veAiPageModal(){
       '<div class="ve-ai-modal-head">',
       '<div class="ve-ai-modal-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>',
       '<div class="ve-ai-modal-head-text">',
-      '<h3 id="vp-ai-page-title">AI Page Edit</h3>',
-      '<p>Describe changes to the whole page. Claude rewrites the HTML while preserving your structure, styles, and layout.</p>',
+      '<h3 id="vp-ai-page-title">General Markup</h3>',
+      '<p>Describe changes to the whole page. Your markup is rewritten while preserving your structure, styles, and layout.</p>',
       '</div>',
       '<button class="ve-ai-modal-close" title="Close" aria-label="Close" onclick="document.getElementById(\'ve-ai-page-modal\').style.display=\'none\'">\u00d7</button>',
       '</div>',
       '<div class="ve-ai-modal-body">',
       '<label class="ve-ai-modal-label" for="vp-ai-page-prompt">Your instructions</label>',
-      '<textarea id="vp-ai-page-prompt" placeholder="Describe the changes you\u2019d like Claude to make to this page\u2026"></textarea>',
+      '<textarea id="vp-ai-page-prompt" placeholder="Describe the changes you\u2019d like to make to this page\u2026"></textarea>',
       '<div id="vp-ai-page-status" class="ve-ai-modal-status"></div>',
       '</div>',
       '<div class="ve-ai-modal-btns">',
@@ -6089,7 +6212,11 @@ async function loadRevisions(){
         +'</div>';
     }).join('');
   }catch(e){
-    list.innerHTML='<div style="color:var(--muted);font-size:13px">Could not load revisions — make sure Server API is configured.</div>';
+    if(/not found|404|no such/i.test(e.message||'')){
+      list.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px 0">No revisions yet. Save a page to start tracking changes.</div>';
+    } else {
+      list.innerHTML='<div style="color:var(--muted);font-size:13px">Could not load revisions: '+esc(e.message)+'</div>';
+    }
   }
 }
 
@@ -6155,67 +6282,69 @@ async function veSavePage(){
 
   try{
     const doc=iframe.contentDocument;
-    // Remove ALL bridge artifacts before serializing
-    ['__fe_done__','__fe_ov__','__fe_badge__','__foundry_bridge__'].forEach(id=>{
-      doc.getElementById(id)?.remove();
+    // IMPORTANT: serialize from a CLONE, never the live document. Stripping the
+    // editing bridge (overlay, data-feid tracking attrs, bridge script) off the
+    // live iframe would leave nothing for the NEXT edit to attach to — the page
+    // would then only save once per page reload. Cloning keeps the live editing
+    // surface fully intact while we produce a clean HTML string to write.
+    const root=doc.documentElement.cloneNode(true);
+    // Remove ALL bridge artifacts from the clone before serializing
+    ['__fe_done__','__fe_ov__','__fe_badge__','__foundry_bridge__','__ve_pause_style__'].forEach(id=>{
+      root.querySelector('#'+id)?.remove();
     });
-    // Remove injected bridge styles (last style tag with data-foundry attr, or by content)
-    doc.querySelectorAll('style').forEach(s=>{
+    // Remove injected bridge styles (data-foundry attr, or by content)
+    root.querySelectorAll('style').forEach(s=>{
       if(s.textContent.includes('__fe_') || s.dataset.foundry) s.remove();
     });
-    // Remove animation-pause artifacts (editing-only)
-    doc.getElementById('__ve_pause_style__')?.remove();
-    doc.documentElement.classList.remove('__ve_paused');
+    // Drop the animation-pause class (editing-only)
+    root.classList.remove('__ve_paused');
     // Remove selection outlines / dashed borders injected as inline styles
-    doc.querySelectorAll('[style*="2147483"]').forEach(el=>{
+    root.querySelectorAll('[style*="2147483"]').forEach(el=>{
       el.style.removeProperty('outline');
       el.style.removeProperty('z-index');
     });
     // Remove ALL editor tracking attributes (bridge uses data-feid; legacy used data-fid)
-    doc.querySelectorAll('[data-fid],[data-feid]').forEach(el=>{
+    root.querySelectorAll('[data-fid],[data-feid]').forEach(el=>{
       el.removeAttribute('data-fid');
       el.removeAttribute('data-feid');
     });
     // Remove any selection class
-    doc.querySelectorAll('.fe-sel,.fe-hover').forEach(el=>{
+    root.querySelectorAll('.fe-sel,.fe-hover').forEach(el=>{
       el.classList.remove('fe-sel','fe-hover');
     });
-    // Hide overlay before serializing (belt + suspenders)
-    const ov=doc.getElementById('__fe_ov__');
-    if(ov) ov.style.display='none';
 
-    const html=('<!DOCTYPE html>\n'+doc.documentElement.outerHTML)
+    const html=('<!DOCTYPE html>\n'+root.outerHTML)
       // Re-arm analytics scripts that veRenderHtml neutralized for the editor
       .replace(/<script type="text\/foundry-ga"/gi,'<script');
     const filePath=pg.path||pg.file;
 
-    // 0. Write revision entry before overwriting
-    const{url,token}=getApiCfg();
-    if(url&&token){
+    // 0. Write a revision entry before overwriting. Goes through api.php via the
+    //    logged-in session (no separate Server-API token needed). Best-effort:
+    //    it never blocks the save if the server is briefly unreachable.
+    try{
+      // Load existing revisions, prepend new entry (max 50 per page)
+      let revs=[];
+      try{ const rd=await apiCall('read_file',{path:'data/revisions.json'}); revs=JSON.parse(rd.content||'[]'); }catch{}
+      revs.unshift({
+        id:'rev_'+Date.now(),
+        page:_curPage,
+        pageTitle:pg.label||pg.title||_curPage,
+        path:filePath,
+        timestamp:new Date().toISOString(),
+        size:html.length,
+        preview:html.slice(0,400)
+      });
+      if(revs.length>50) revs=revs.slice(0,50);
+      await apiCall('write_file',{path:'data/revisions.json',content:JSON.stringify(revs,null,2)});
+      // Store the CURRENT html snapshot before overwrite so we can restore it
       try{
-        // Load existing revisions, prepend new entry (max 50 per page)
-        let revs=[];
-        try{ const rd=await apiCall('read_file',{path:'data/revisions.json'}); revs=JSON.parse(rd.content||'[]'); }catch{}
-        revs.unshift({
-          id:'rev_'+Date.now(),
-          page:_curPage,
-          pageTitle:pg.label||pg.title||_curPage,
-          path:filePath,
-          timestamp:new Date().toISOString(),
-          size:html.length,
-          preview:html.slice(0,400)
-        });
-        if(revs.length>50) revs=revs.slice(0,50);
-        await apiCall('write_file',{path:'data/revisions.json',content:JSON.stringify(revs,null,2)});
-        // Store the CURRENT html snapshot before overwrite so we can restore it
-        try{
-          const curSnap = await apiCall('read_file',{path:filePath});
-          if(curSnap.content) await apiCall('write_file',{path:'data/rev_'+revs[0].id+'.html',content:curSnap.content});
-        }catch{}
-      }catch(e){ console.warn('Revision log failed:',e.message); }
-    }
+        const curSnap = await apiCall('read_file',{path:filePath});
+        if(curSnap.content) await apiCall('write_file',{path:'data/rev_'+revs[0].id+'.html',content:curSnap.content});
+      }catch{}
+    }catch(e){ console.warn('Revision log failed:',e.message); }
 
     // 1. Save to server
+    const{url,token}=getApiCfg();
     let savedServer=false, serverErr='';
     if(url&&token){
       try{
@@ -6345,7 +6474,7 @@ async function saveInjections(){try{const sha=await ghSHA(F_INJECT);await ghWrit
 function saveMailgunCfg(){const f=[['s-mg-domain','cd_mg_domain'],['s-mg-from','cd_mg_from'],['s-mg-notify','cd_mg_notify']];f.forEach(([id,key])=>{const el=document.getElementById(id);if(el&&el.value.trim())localStorage.setItem(key,el.value.trim());});const k=document.getElementById('s-mg-key');if(k&&k.value.trim()){localStorage.setItem('cd_mg_key',k.value.trim());k.value='';k.placeholder='Key saved';}toast('Mailgun saved','ok');}
 async function saveTplRepo(){
   const v=document.getElementById('s-tpl-repo')?.value.trim()||'';
-  const m=document.getElementById('s-update-mode')?.value||'manual';
+  const m=document.getElementById('s-update-mode')?.value||'notify';
   if(!v){ toast('Enter repo path','err'); return; }
   // Persist site-wide in data/site.json so all devices agree
   if(!_site.update) _site.update={};
@@ -6374,6 +6503,10 @@ function getApiBase(){
   return p+'api.php';
 }
 function getToken(){return localStorage.getItem('cd_token')||'';}
+// True when apiCall() has some way to authenticate: a login session (cd_token)
+// or the legacy shared API token. getApiBase() always resolves the URL itself,
+// so a session alone is enough — the legacy Server API token is optional.
+function canCallApi(){ return !!getToken() || !!localStorage.getItem('cd_api_token'); }
 async function apiCall(action,body={}){
   const headers={'Content-Type':'application/json'};
   const stok=getToken();                       if(stok) headers['X-Session-Token']=stok; // session auth (login)
@@ -6419,7 +6552,7 @@ function initImportFromServer(){
   status.innerHTML =
     ifsStatusBadge('Server API', !!(url && token), url ? ' · ' + url.replace(/^https?:\/\//,'').split('/')[0] : ' · not set') +
     ifsStatusBadge('GitHub',     !!(repo && pat),   repo ? ' · ' + repo.split('/')[1] : ' · not set') +
-    ifsStatusBadge('Claude AI',  !!apiKey,           apiKey ? ' · key set' : ' · optional, for block extraction');
+    ifsStatusBadge('Markup',     !!apiKey,           apiKey ? ' · key set' : ' · optional, for block extraction');
   if(!url || !token){
     document.getElementById('ifs-body').innerHTML =
       '<div class="warn-b">Server API not configured. Go to <strong>Settings → Server API</strong> and set the URL and token.</div>';
@@ -6533,6 +6666,67 @@ function gotoImportedPages() {
   if (_curPage && _pages[_curPage]) fillPageProps();
 }
 
+// Extract the inner <body> HTML (scripts removed) from a full HTML document.
+function htmlBodyInner(html){
+  let s = String(html||'');
+  const m = s.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  s = m ? m[1] : s;
+  return s.replace(new RegExp('<script[\\s\\S]*?<'+'/script>','gi'),'').trim();
+}
+
+// Collect the page's CSS so imported pages keep their styling: inline <style>
+// blocks plus same-origin linked stylesheets (fetched from the server and
+// inlined). External (http/CDN) stylesheets are left referenced as-is.
+// relPath is the page's path on the server, used to resolve relative hrefs.
+async function extractPageCSS(html, relPath){
+  let css = '';
+  const styleRe = /<style[^>]*>([\s\S]*?)<\/style>/gi; let m;
+  while((m = styleRe.exec(html))) css += '\n' + m[1];
+  const baseDir = (relPath && relPath.includes('/')) ? relPath.replace(/[^/]*$/,'') : '';
+  const linkRe = /<link\b[^>]*>/gi; let lm; const hrefs = [];
+  while((lm = linkRe.exec(html))){
+    if(!/stylesheet/i.test(lm[0])) continue;
+    const hm = lm[0].match(/href\s*=\s*["']([^"']+)["']/i);
+    if(hm) hrefs.push(hm[1]);
+  }
+  for(const href of hrefs){
+    if(/^https?:\/\//i.test(href) || href.startsWith('//')) continue; // keep external/CDN refs as-is
+    let p = href.replace(/[?#].*$/,'');
+    p = p.startsWith('/') ? p.replace(/^\/+/,'') : (baseDir + p);
+    try{ const d = await apiCall('read_file', {path:p}); if(d && d.content) css += '\n/* '+href+' */\n' + d.content; }
+    catch(e){ /* missing/unreadable — skip; the original <link> stays on the page */ }
+  }
+  return css.trim();
+}
+
+// The block extractor (previously referenced but never defined — which is why
+// every import fell through to a truncated HTML dump). With Markup configured
+// it asks the engine to split the body into ordered, editable sections with the
+// original markup kept intact; otherwise, or on any failure, it stores the whole
+// body as one faithful HTML block. The page CSS is captured separately.
+async function extractBlocksFromHTML(html, pid, apiKey){
+  const body = htmlBodyInner(html);
+  // The Markup key now lives server-side, so trigger the smart split whenever
+  // the account has Markup access (callClaudeAPI uses the server key, and
+  // falls back to a faithful single block if it isn't configured).
+  let canMarkup = !!apiKey;
+  try{ if(getEffectivePerms(getSessionUser()).aiEdit) canMarkup = true; }catch(e){}
+  if(canMarkup){
+    try{
+      const sys = 'You split an HTML page body into ordered sections for a block-based CMS. Return ONLY a JSON array; each item is {"label":string,"html":string}. Preserve the original markup, class names, ids, and inline styles EXACTLY — never rewrite, restyle, or summarize. Split into logical sections (header/nav, hero, each content section, footer). No prose, no code fences.';
+      const resp = await callClaudeAPI({ system: sys, max_tokens: 8000, messages:[{role:'user', content: body.slice(0, 60000)}] }, apiKey, 2);
+      const txt = (resp && resp.content && resp.content[0] && resp.content[0].text) || '';
+      const json = txt.slice(txt.indexOf('['), txt.lastIndexOf(']') + 1);
+      const sections = JSON.parse(json);
+      if(Array.isArray(sections)){
+        const blocks = sections.filter(s => s && s.html).map(s => ({id: uid(), type:'html', data:{html: String(s.html)}}));
+        if(blocks.length) return blocks;
+      }
+    }catch(e){ /* fall through to a single faithful block */ }
+  }
+  return [{id: uid(), type:'html', data:{html: body}}];
+}
+
 async function importFromServerRun(forceOverride){
   const selected = Array.from(document.querySelectorAll('.ifs-chk:checked'))
     .map(c => c.dataset.path).filter(Boolean);
@@ -6558,9 +6752,7 @@ async function importFromServerRun(forceOverride){
   importBtn.disabled = true; importBtn.textContent = 'Importing…';
 
   const ll = (msg) => { log.innerHTML += `<div>${msg}</div>`; log.scrollTop = log.scrollHeight; };
-  ll(`<span class="l-info">Importing ${selected.length} page(s)…</span>`);
-  if(apiKey)  ll('<span class="l-info">Claude API key found — will extract blocks from HTML</span>');
-  else        ll('<span class="l-warn">No Claude API key — pages will be imported as raw HTML blocks</span>');
+  ll(`<span class="l-info">Importing ${selected.length} page(s) — markup + CSS preserved…</span>`);
 
   // Load existing pages.json + site.json from GitHub
   let pagesData = {}, siteData = {nav:[]}, pagesSHA = null, siteSHA = null;
@@ -6592,26 +6784,23 @@ async function importFromServerRun(forceOverride){
       failed++; continue;
     }
 
-    // Step 2: Extract blocks
+    // Step 2: Capture the page's CSS (so the header/layout keep their styling),
+    // then split into blocks. No more 8 KB truncation.
+    let pageCss = '';
+    try{ pageCss = await extractPageCSS(html, relPath); if(pageCss) ll(`<span class="l-ok">✓</span> Captured ${(pageCss.length/1024).toFixed(1)} KB of CSS`); }
+    catch(e){ console.warn('CSS capture failed:', e.message); }
     let blocks = [];
-    if(apiKey && html){
-      try{
-        ll('<span class="l-info">⟳</span> Extracting blocks with Claude AI…');
-        blocks = await extractBlocksFromHTML(html, pid, apiKey);
-        ll(`<span class="l-ok">✓</span> Extracted ${blocks.length} block(s): ${blocks.map(b=>b.type).join(', ')}`);
-      }catch(e){
-        ll(`<span class="l-warn">⚠</span> Block extraction failed (${esc(e.message)}) — importing as HTML block`);
-        // Fallback: single HTML block with the original content
-        blocks = [{id:uid(), type:'html', data:{html: html.replace(new RegExp('<script[\\s\\S]*?<'+'/script>','gi'),'').slice(0,8000)}}];
-      }
-    } else {
-      // No Claude key: store as a single html block
-      blocks = [{id:uid(), type:'html', data:{html: html.replace(new RegExp('<script[\\s\\S]*?<'+'/script>','gi'),'').slice(0,8000)}}];
-      ll('<span class="l-info">ℹ</span> Stored as HTML block (add Claude API key for semantic extraction)');
+    try{
+      ll('<span class="l-info">⟳</span> Extracting blocks…');
+      blocks = await extractBlocksFromHTML(html, pid, apiKey);
+      ll(`<span class="l-ok">✓</span> ${blocks.length} block(s)${apiKey?'':' (add a Markup key for editable sections)'}`);
+    }catch(e){
+      ll(`<span class="l-warn">⚠</span> ${esc(e.message)} — stored as one HTML block`);
+      blocks = [{id:uid(), type:'html', data:{html: htmlBodyInner(html)}}];
     }
 
-    // Step 3: Save page data
-    pagesData[pid] = {title, file: fname, path: relPath, css: '', blocks};
+    // Step 3: Save page data — CSS preserved so styling survives a re-render
+    pagesData[pid] = {title, file: fname, path: relPath, css: pageCss, blocks};
 
     // Step 4: Keep original HTML as-is — visual editor reads it directly
 
