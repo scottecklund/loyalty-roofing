@@ -1,0 +1,20 @@
+# Fourge — local secrets & runtime files (never commit)
+admin/config.secret.php
+
+# SQLite database (hashes + encrypted secrets) — created at runtime
+admin/fourge.db
+admin/fourge.db-wal
+admin/fourge.db-shm
+*.db
+*.db-wal
+*.db-shm
+
+# Google Analytics service-account key + token cache
+admin/ga-service-account.json
+admin/.ga-token.json
+
+# FTP deploy state + OS/editor cruft
+.ftp-deploy-sync-state.json
+.DS_Store
+Thumbs.db
+*.swp
