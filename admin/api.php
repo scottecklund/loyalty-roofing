@@ -8,7 +8,7 @@
 require_once __DIR__ . '/db.php';      // SQLite data layer (users, sessions, encrypted secrets)
 
 // ── CONFIGURATION ────────────────────────────────────────────────────────────
-define('API_TOKEN',    'CHANGE_ME');  // SET A STRONG SECRET before deploying — must match Fourge → Settings → Server API token
+define('API_TOKEN',    '44i123');  // SET A STRONG SECRET before deploying — must match Fourge → Settings → Server API token
 define('PUBLIC_HTML',  realpath(dirname(__DIR__)));
 
 // Mailgun
