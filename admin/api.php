@@ -310,10 +310,13 @@ function cmsReadFile($body) {
 // ── WRITE FILE ────────────────────────────────────────────────────────────────
 
 function cmsWriteFile($body) {
-    $relPath = $body['path']    ?? '';
+    $relPath = $body['path'] ?? ($_POST['path'] ?? '');
     $content = $body['content'] ?? '';
-    // Content may arrive base64-encoded (content_b64) so the request body gets
-    // past shared-host WAFs that block raw HTML/JS in POSTs. Decode if present.
+    // Content may arrive three ways:
+    //  1) multipart file part (content_file) — primary path; sails past WAFs
+    //     that block raw HTML/JS in a JSON POST (same channel as image uploads),
+    //  2) base64 in JSON (content_b64) — legacy WAF-bypass,
+    //  3) plain JSON content — legacy.
     if (isset($body['content_b64']) && is_string($body['content_b64'])) {
         $decoded = base64_decode($body['content_b64'], true);
         if ($decoded === false) {
@@ -322,6 +325,10 @@ function cmsWriteFile($body) {
             return;
         }
         $content = $decoded;
+    }
+    if (!empty($_FILES['content_file']['tmp_name']) && is_uploaded_file($_FILES['content_file']['tmp_name'])) {
+        $c = file_get_contents($_FILES['content_file']['tmp_name']);
+        if ($c !== false) $content = $c;
     }
     $dest    = PUBLIC_HTML . '/' . ltrim($relPath, '/');
     if (gaIsProtectedPath($dest)) {
