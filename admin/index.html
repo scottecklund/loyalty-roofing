@@ -5827,10 +5827,18 @@ async function veAiPageRun(){
     return;
   }
 
-  if(status) status.textContent = 'Sending to Claude (\u2248 '+Math.round(pageHtml.length/800)+' tokens)\u2026';
+  // Protect CSS + scripts from the round-trip. The model can't reliably
+  // reproduce a large <style> block within the token budget \u2014 that's how CSS
+  // gets "removed". Swap every <style>/<link>/<script> for a short placeholder,
+  // send only the visible markup, then restore them verbatim afterward.
+  const _vault=[];
+  const stash=(re)=>{ pageHtml = pageHtml.replace(re, m=>{ _vault.push(m); return '<!--FXV'+(_vault.length-1)+'-->'; }); };
+  stash(/<style[\s\S]*?<\/style>/gi);
+  stash(/<script[\s\S]*?<\/script>/gi);
+  stash(/<link\b[^>]*>/gi);
+  const stripped = pageHtml.replace(/\s{3,}/g,'  ');
 
-  // Strip script tags to reduce tokens but keep everything else
-  const stripped = pageHtml.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/\s{3,}/g,'  ');
+  if(status) status.textContent = 'Sending to Claude (\u2248 '+Math.round(stripped.length/800)+' tokens)\u2026';
 
   try{
     let data;
@@ -5839,12 +5847,18 @@ async function veAiPageRun(){
         model:'claude-opus-4-8',
         max_tokens:8192,
         thinking:{type:'adaptive'},
-        system:'You are editing a website\'s HTML. The user will describe changes. Return the COMPLETE modified HTML document. Preserve all styles, scripts (add them back exactly as given), classes, IDs, and structure. Only change what the user asks. Return raw HTML only \u2014 no markdown, no explanation, no code fences.',
-        messages:[{role:'user',content:'Current page HTML:\n\n'+stripped+'\n\n---\n\nChange request: '+prompt+'\n\nReturn the complete modified HTML.'}]
+        system:'You are editing a website\'s HTML. Comments like <!--FXV0--> are placeholders standing in for the site\'s CSS and scripts \u2014 keep every one EXACTLY where it appears; never modify, reorder, or delete them. Change only what the user asks; preserve all classes, IDs, and structure. Return the COMPLETE modified HTML document with all placeholders intact \u2014 raw HTML only, no markdown, no explanation, no code fences.',
+        messages:[{role:'user',content:'Current page HTML (CSS/JS replaced by FXV placeholders):\n\n'+stripped+'\n\n---\n\nChange request: '+prompt+'\n\nReturn the complete modified HTML with every placeholder kept exactly as-is.'}]
       }, apiKey);
     }catch(e){ toast('Claude API: '+e.message,'err'); return; }
-    const newHtml = ((Array.isArray(data.content)?(data.content.find(b=>b.type==='text')?.text||''):'')).replace(/^```html?\n?/,'').replace(/\n?```$/,'').trim();
+    let newHtml = ((Array.isArray(data.content)?(data.content.find(b=>b.type==='text')?.text||''):'')).replace(/^```html?\n?/,'').replace(/\n?```$/,'').trim();
     if(!newHtml){ toast('No response from Claude','err'); return; }
+    // Restore the protected CSS/scripts verbatim.
+    newHtml = newHtml.replace(/<!--FXV(\d+)-->/g, (m,i)=> (_vault[+i] !== undefined ? _vault[+i] : ''));
+    // Safety net: if the model dropped any <style>/<link> placeholder, re-inject
+    // those into <head> so CSS can never be lost even on a sloppy response.
+    const missing=_vault.filter(v=>/^<(style|link)\b/i.test(v) && newHtml.indexOf(v)===-1);
+    if(missing.length && /<\/head>/i.test(newHtml)) newHtml=newHtml.replace(/<\/head>/i, missing.join('\n')+'\n</head>');
 
     if(status) status.textContent = 'Applying changes to editor\u2026';
 
@@ -5898,20 +5912,20 @@ async function veSaveTemplateToAll(zone){
     const filePath = pg.file || (pg.id==='home'?'index.html':pg.id+'.html');
     try{
       const data = await apiCall('read_file',{path:filePath});
-      let html = data.content||'';
-      if(!html) continue;
-
-      // Replace the matching section using regex
-      const tag = zone==='nav'?'nav':(zone==='header'?'header':'footer');
-      // Build regex to match the section (handles nested tags)
-      // Simple approach: replace from <header/footer to </header/footer>
-      const re = new RegExp('<'+tag+'(\\\\s[^>]*)?>([\\\\s\\\\S]*?)<\\/'+tag+'>','i');
-      if(re.test(html)){
-        html = html.replace(re, templateHtml);
-        await apiCall('write_file',{path:filePath,content:html});
+      const html = data.content||'';
+      if(!html){ failed++; continue; }
+      // Swap the matching section via the DOM, not regex: this handles nested
+      // tags, div-based headers, any attribute order, and — crucially — never
+      // touches the page's <head>/CSS. We re-serialize only after the swap.
+      const pdoc = new DOMParser().parseFromString(html,'text/html');
+      const target = pdoc.querySelector(selectors[zone] || zone);
+      if(target){
+        target.outerHTML = templateHtml;
+        const out = '<!DOCTYPE html>\n'+pdoc.documentElement.outerHTML;
+        await apiCall('write_file',{path:filePath,content:out});
         updated++;
       } else {
-        console.warn('No '+tag+' found in '+filePath);
+        console.warn('No '+zone+' found in '+filePath);
         failed++;
       }
     }catch(e){
@@ -5921,7 +5935,7 @@ async function veSaveTemplateToAll(zone){
   }
 
   if(updated>0) toast(updated+' page(s) updated with new '+zone+(failed?' ('+failed+' skipped)':''),'ok');
-  else toast('No pages updated — could not find '+zone+' tag in page files','err');
+  else toast('No pages updated — no '+zone+' section found in your page files','err');
 
   // Also update _veHtml cache and GitHub
   const{repo,pat}=ghCfg();
