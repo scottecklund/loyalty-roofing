@@ -6537,11 +6537,21 @@ function authHeaders(extra){
   const a=localStorage.getItem('cd_api_token'); if(a) h['X-Api-Token']=a;
   return h;
 }
+// UTF-8-safe base64 (matches the GitHub write encoding).
+function b64EncodeUnicode(str){ return btoa(unescape(encodeURIComponent(String(str)))); }
 async function apiCall(action,body={}){
   const headers={'Content-Type':'application/json'};
   const stok=getToken();                       if(stok) headers['X-Session-Token']=stok; // session auth (login)
   const atok=localStorage.getItem('cd_api_token'); if(atok) headers['X-Api-Token']=atok;  // legacy shared token (file ops)
   const payload={action,...body}; if(atok) payload.token=atok;
+  // Many shared hosts run a WAF that blocks POST bodies containing raw HTML/JS,
+  // so saving a page 404s before it ever reaches PHP. Send file content
+  // base64-encoded (content_b64) to keep the body opaque; api.php decodes it.
+  // Covers every write_file caller (page save, revisions, pages.json, etc.).
+  if(action==='write_file' && typeof payload.content==='string'){
+    payload.content_b64 = b64EncodeUnicode(payload.content);
+    delete payload.content;
+  }
   const res=await fetch(getApiBase(),{method:'POST',headers,body:JSON.stringify(payload)});
   let d=null; try{ d=await res.json(); }catch(e){ throw new Error('Server returned an invalid response ('+res.status+')'); }
   if(d&&d.error){ const err=new Error(d.error); err.status=res.status; throw err; }
