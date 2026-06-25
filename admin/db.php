@@ -270,6 +270,12 @@ function fourgeSecretPolicy() {
         'github_pat'    => 4,  // Architect only — used by the browser to publish
         'repo_override' => 4,  // Architect only — target repo (owner/repo)
         'claude_key'    => 4,  // Architect only — server-side AI proxy key
+        // Mailgun (forms) — Super Admin and above. Stored encrypted in the DB so
+        // it lives server-side (not per-browser) and survives a cache clear.
+        'mg_domain'     => 3,
+        'mg_api_key'    => 3,
+        'mg_from'       => 3,
+        'mg_notify_to'  => 3,
     ];
 }
 
