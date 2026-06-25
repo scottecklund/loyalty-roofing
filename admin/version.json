@@ -1,0 +1,16 @@
+{
+  "version": "1.2.0",
+  "releaseDate": "2026-06-24",
+  "notes": "Self-update: sites pull CMS engine files from this repo (off / notify / auto modes, ~daily check), faithful HTML import with CSS preservation, Revisions fix, General Markup rename. Builds on the 1.2.0 SQLite backend (server-side Argon2id auth + encrypted secrets), Architect tier, and username-or-email login.",
+  "files": [
+    "admin/index.html",
+    "admin/db.php",
+    "block-renderer.jsx",
+    "blog-post.jsx",
+    "interior-shell.jsx",
+    "posts.jsx",
+    "preview.html"
+  ],
+  "apiManual": true,
+  "apiNote": "admin/api.php holds this site's secrets (API token, Mailgun keys) and is never auto-updated. If a release changes api.php, update it by hand."
+}
