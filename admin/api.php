@@ -447,10 +447,26 @@ function cmsVerifyRecaptcha($secret, $token) {
     return !empty($data['success']);
 }
 
+// Resolve Mailgun config from the encrypted DB secrets first (server-side,
+// editable in Settings), falling back to the config.secret.php constants.
+function cmsMailgun() {
+    $get = function ($name, $fallback) {
+        try { $v = fourgeGetSecret(fourgeDb(), $name); return ($v !== null && $v !== '') ? $v : $fallback; }
+        catch (Throwable $e) { return $fallback; }
+    };
+    return [
+        'domain' => $get('mg_domain',    MG_DOMAIN),
+        'key'    => $get('mg_api_key',   MG_API_KEY),
+        'from'   => $get('mg_from',      MG_FROM),
+        'notify' => $get('mg_notify_to', MG_NOTIFY_TO),
+    ];
+}
+
 function cmsSendForm($body) {
+    $mg      = cmsMailgun();
     $fields  = $body['fields']  ?? [];
     $subject = $body['subject'] ?? 'New Form Submission';
-    $toEmail = $body['to']      ?? MG_NOTIFY_TO;
+    $toEmail = $body['to']      ?? $mg['notify'];
     $siteUrl = $body['siteUrl'] ?? '';
     $formId  = $body['formId']  ?? '';
     $rcToken = $body['recaptcha'] ?? '';
@@ -486,12 +502,12 @@ function cmsSendForm($body) {
       <p style="font-size:11px;color:#A09882;margin-top:16px">Sent via Fourge CMS · ' . date('Y-m-d H:i') . '</p>
     </body></html>';
 
-    $ch = curl_init('https://api.mailgun.net/v3/' . MG_DOMAIN . '/messages');
+    $ch = curl_init('https://api.mailgun.net/v3/' . $mg['domain'] . '/messages');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_USERPWD        => 'api:' . MG_API_KEY,
+        CURLOPT_USERPWD        => 'api:' . $mg['key'],
         CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => ['from'=>MG_FROM,'to'=>$toEmail,'subject'=>$subject,'text'=>$text,'html'=>$html],
+        CURLOPT_POSTFIELDS     => ['from'=>$mg['from'],'to'=>$toEmail,'subject'=>$subject,'text'=>$text,'html'=>$html],
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_TIMEOUT        => 15,
     ]);
@@ -920,8 +936,9 @@ function fourgeApiChangePassword($me, $body) {
 }
 
 // Secrets whose cleartext the browser legitimately needs (the Architect's
-// browser publishes to GitHub directly). Everything else is status-only.
-function fourgeClientFullSecrets() { return ['github_pat', 'repo_override']; }
+// browser publishes to GitHub directly; the Mailgun routing fields are shown so
+// they can be edited). The Mailgun API KEY stays status-only — never sent back.
+function fourgeClientFullSecrets() { return ['github_pat', 'repo_override', 'mg_domain', 'mg_from', 'mg_notify_to']; }
 
 function fourgeApiGetSecrets($me) {
     $pdo = fourgeDb();
@@ -1002,6 +1019,7 @@ function fourgeApiRepoFetch($me, $body) {
     // PRIVATE repos: authenticated GitHub Contents API (raw media type).
     $pat = null;
     try { $pat = fourgeGetSecret(fourgeDb(), 'github_pat'); } catch (Throwable $e) { $pat = null; }
+    $patNote = ' No GitHub token is saved (Settings → GitHub), which a private repo needs.';
     if ($pat) {
         $api = "https://api.github.com/repos/{$repo}/contents/" . $path . '?ref=' . rawurlencode($branch);
         $ch  = curl_init($api);
@@ -1023,7 +1041,19 @@ function fourgeApiRepoFetch($me, $body) {
             echo json_encode(['ok' => true, 'content' => $res, 'source' => 'api', 'branch' => $branch]);
             return;
         }
-        // fall through to public raw on any auth/API hiccup
+        // Capture WHY the authenticated call failed, so the client can guide the user.
+        if ($err) {
+            $patNote = ' GitHub API request failed: ' . $err . '.';
+        } else {
+            $msg = '';
+            $j = json_decode((string)$res, true);
+            if (is_array($j) && !empty($j['message'])) $msg = $j['message'];
+            if ($code === 401)      $patNote = ' The saved GitHub token is invalid or expired (401).';
+            elseif ($code === 404)  $patNote = ' The saved GitHub token cannot see ' . $repo . ' or that file (404) — give the token access to this private repo.';
+            elseif ($code === 403)  $patNote = ' GitHub denied the token (403' . ($msg ? ': ' . $msg : '') . ') — check its scope/rate limit.';
+            else                    $patNote = ' GitHub API responded ' . $code . ($msg ? ' ("' . $msg . '")' : '') . '.';
+        }
+        // fall through to public raw as a last resort
     }
 
     // PUBLIC repos: raw.githubusercontent (no token).
@@ -1044,7 +1074,7 @@ function fourgeApiRepoFetch($me, $body) {
     if ($err) { http_response_code(502); echo json_encode(['error' => 'Repo fetch failed: ' . $err]); return; }
     if ($code < 200 || $code >= 300) {
         http_response_code(502);
-        echo json_encode(['error' => 'Repo returned HTTP ' . $code . ' for ' . $path . ($code === 404 ? ' (private repo? set the GitHub PAT in Settings)' : '')]);
+        echo json_encode(['error' => "Couldn't fetch {$path} from {$repo}@{$branch} (HTTP {$code})." . ($code === 404 ? $patNote : '')]);
         return;
     }
     echo json_encode(['ok' => true, 'content' => $res, 'source' => 'raw', 'branch' => $branch]);
