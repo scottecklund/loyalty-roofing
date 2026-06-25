@@ -1540,10 +1540,8 @@ textarea.fb-input{resize:vertical}
           <div class="fg"><label>Repository (owner/repo)</label><input type="text" id="s-repo-override" placeholder="scottecklund/my-client-site"></div>
           <button class="fd-btn-primary" onclick="saveRepoOverride()">Save Override</button>
         </div>
-        <div class="si-sec"><h2>Server API</h2><div class="desc">Enables direct file upload and page scanning. Upload <code>admin/api.php</code> first.</div>
-          <div class="fr"><div class="fg"><label>API URL</label><input type="text" id="s-api-url" placeholder="https://yoursite.com/admin/api.php"></div><div class="fg"><label>API Token</label><input type="password" id="s-api-token" placeholder="token from api.php"></div></div>
-          <div style="display:flex;gap:8px"><button class="fd-btn-primary" onclick="saveApiCfg()">Save</button><button class="fd-btn-secondary" onclick="pingApi()">Test</button></div>
-        </div>
+        <!-- Server API is automatic: the admin panel talks to its co-located
+             api.php using your login session. No per-browser URL/token to set. -->
         <div class="si-sec"><h2>Mailgun (Forms)</h2><div class="desc">Used for contact form submissions.</div>
           <div class="fr"><div class="fg"><label>Sending Domain</label><input type="text" id="s-mg-domain" placeholder="mg.example.com"></div><div class="fg"><label>API Key</label><input type="password" id="s-mg-key" placeholder="key…"></div></div>
           <div class="fr"><div class="fg"><label>From Address</label><input type="text" id="s-mg-from" placeholder="postmaster@mg.example.com"></div><div class="fg"><label>Notify Email</label><input type="text" id="s-mg-notify" placeholder="client@example.com"></div></div>
@@ -3286,7 +3284,7 @@ async function postImgPickerUpload(input){
     fd.append('action','upload');
     fd.append('token',token);
     fd.append('files',file);
-    const res=await fetch(apiUrl,{method:'POST',headers:{'X-Api-Token':token},body:fd});
+    const res=await fetch(apiUrl,{method:'POST',headers:authHeaders(),body:fd});
     const d=await res.json();
     if(d.error) throw new Error(d.error);
     await veLoadMediaLib();
@@ -3627,7 +3625,7 @@ async function uploadMedia(files){
       fd.append('action','upload');
       fd.append('token',token);
       fd.append('files',f);
-      const res=await fetch(url,{method:'POST',headers:{'X-Api-Token':token},body:fd});
+      const res=await fetch(url,{method:'POST',headers:authHeaders(),body:fd});
       const d=await res.json();
       if(d.error) throw new Error(d.error);
       const r=d.results?.[0];
@@ -4110,8 +4108,7 @@ function loadSettings(){
   const{repo,pat}=ghCfg();
   const sRepoInfo=document.getElementById('s-repo-info');if(sRepoInfo)sRepoInfo.innerHTML=`Repo: <strong>${repo||'Not set — add github.repo to data/site.json'}</strong>`;
   const roEl=document.getElementById('s-repo-override');if(roEl)roEl.value=localStorage.getItem('cd_repo_override')||'';
-  const urlEl=document.getElementById('s-api-url');if(urlEl)urlEl.value=localStorage.getItem('cd_api_url')||'';
-  const tokEl=document.getElementById('s-api-token');if(tokEl){tokEl.value='';tokEl.placeholder=localStorage.getItem('cd_api_token')?'Token saved':'token from api.php';}
+  // Server API is automatic now (co-located api.php + login session) — no fields to populate.
   const mgFields=[['s-mg-domain','cd_mg_domain','mg.example.com'],['s-mg-from','cd_mg_from','postmaster@mg.example.com'],['s-mg-notify','cd_mg_notify','']];
   mgFields.forEach(([id,key,def])=>{const el=document.getElementById(id);if(el)el.value=localStorage.getItem(key)||def;});
   const mgKeyEl=document.getElementById('s-mg-key');if(mgKeyEl){mgKeyEl.value='';mgKeyEl.placeholder=localStorage.getItem('cd_mg_key')?'Key saved':'key…';}
@@ -4714,6 +4711,9 @@ async function veLoadPage(id){
   // ── Strategy 1: load via direct URL (best — CSS/images work natively) ──
   let siteBase=(_site.website||'').replace(/\/$/,'');
   if(siteBase&&!siteBase.startsWith('http')) siteBase='https://'+siteBase;
+  // Fall back to the site root derived from THIS admin URL (the admin lives at
+  // <site>/admin/), so the editor works out of the box with no Website URL set.
+  if(!siteBase) siteBase=autoSiteBase();
 
   if(siteBase){
     iframe.onload=null;
@@ -4758,9 +4758,8 @@ async function veLoadPage(id){
 
 async function veLoadPageViaApi(id,filePath){
   const iframe=document.getElementById('visual-iframe');
-  const{url,token}=getApiCfg();
-  if(!url||!token){
-    veShowEmpty('Set your Website URL in Design \u2192 General, or configure Server API in Settings to enable the editor.');
+  if(!canCallApi()){
+    veShowEmpty('Your session has expired \u2014 please sign in again to load this page.');
     return;
   }
   try{
@@ -5114,7 +5113,7 @@ function veShowEmpty(msg=''){
     '<div class="c">',
     '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
     '<h3>'+display.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</h3>',
-    '<p>Click a page in the sidebar, or go to <strong>Site Factory</strong> to import pages.</p>',
+    '<p>Click a page in the sidebar to start editing.</p>',
     '</div></body></html>'
   ].join('');
   iframe.srcdoc=html;
@@ -5495,7 +5494,7 @@ async function callClaudeAPI(body, apiKey, tries){
     try{
       const res = await fetch(url,{
         method:'POST',
-        headers:{ 'Content-Type':'application/json', 'X-Api-Token':token },
+        headers: authHeaders({ 'Content-Type':'application/json' }),
         body: JSON.stringify({ action:'claude_proxy', token, user, ...body })
       });
       const status = res.status;
@@ -6082,7 +6081,7 @@ async function vePickerUpload(file){
     fd.append('action','upload');
     fd.append('token',token);
     fd.append('files',file);
-    const res = await fetch(url,{method:'POST',headers:{'X-Api-Token':token},body:fd});
+    const res = await fetch(url,{method:'POST',headers:authHeaders(),body:fd});
     const d = await res.json();
     if(d.error) throw new Error(d.error);
     const result = d.results?.[0];
@@ -6389,7 +6388,19 @@ async function veSavePage(){
 function normSiteBase(){
   let base=(_site.website||'').trim().replace(/\/+$/,'');
   if(base && !/^https?:\/\//i.test(base)) base='https://'+base;
+  if(!base) base=autoSiteBase(); // derive from the admin URL when unset
   return base;
+}
+
+// Derive the public site root from THIS admin page's URL. The admin panel is
+// served at <site>/admin/, so stripping the /admin/… segment yields the site
+// root — letting the editor load pages with no Website URL configured.
+function autoSiteBase(){
+  try{
+    const origin=window.location.origin;
+    const path=window.location.pathname.replace(/\/admin\/?.*$/i,'');
+    return (origin+path).replace(/\/+$/,'');
+  }catch(e){ return ''; }
 }
 
 function veOpenPreview(){
@@ -6491,7 +6502,18 @@ async function saveTplRepo(){
 async function pushUsersSites(){toast('Push to sites coming soon','ok');}
 
 // ── SERVER API ────────────────────────────────
-function getApiCfg(){return{url:localStorage.getItem('cd_api_url')||'',token:localStorage.getItem('cd_api_token')||''};}
+// The admin panel and api.php live on the SAME server, and the user is already
+// logged in, so the client needs NO per-browser "Server API" configuration:
+//   • url   → the co-located api.php, auto-resolved by getApiBase() (an explicit
+//             cd_api_url, for the rare remote-managed setup, still wins).
+//   • token → the login SESSION token, so every legacy "if(url&&token)" gate in
+//             the app passes out of the box (a legacy cd_api_token still wins).
+function getApiCfg(){
+  return {
+    url:   (localStorage.getItem('cd_api_url')||'').trim()   || getApiBase(),
+    token: (localStorage.getItem('cd_api_token')||'').trim() || getToken(),
+  };
+}
 // api.php is co-located with this admin page. Resolve it as an ABSOLUTE path in
 // the page's own folder so it works regardless of a trailing slash (/admin vs
 // /admin/) or a subfolder install. An explicit cd_api_url still wins.
@@ -6507,6 +6529,14 @@ function getToken(){return localStorage.getItem('cd_token')||'';}
 // or the legacy shared API token. getApiBase() always resolves the URL itself,
 // so a session alone is enough — the legacy Server API token is optional.
 function canCallApi(){ return !!getToken() || !!localStorage.getItem('cd_api_token'); }
+// Auth headers for direct (non-apiCall) fetches such as multipart file uploads.
+// Sends the session token (primary) plus any legacy shared token.
+function authHeaders(extra){
+  const h=Object.assign({},extra||{});
+  const s=getToken();                           if(s) h['X-Session-Token']=s;
+  const a=localStorage.getItem('cd_api_token'); if(a) h['X-Api-Token']=a;
+  return h;
+}
 async function apiCall(action,body={}){
   const headers={'Content-Type':'application/json'};
   const stok=getToken();                       if(stok) headers['X-Session-Token']=stok; // session auth (login)
@@ -6911,7 +6941,7 @@ async function importFromServerRun(forceOverride){
 
 // File upload (drag into server)
 function srvDrop(e){e.preventDefault();dzLeave();uploadToServer(e.dataTransfer.files);}
-async function uploadToServer(files){if(!files?.length)return;const{url,token}=getApiCfg();if(!url||!token){toast('Configure Server API in Settings first','err');return;}const log=document.getElementById('srv-upload-log');log.className='log-box on';log.innerHTML='';const ll=m=>{log.innerHTML+=`<div>${m}</div>`;log.scrollTop=log.scrollHeight;};ll(`<span class="l-info">Uploading ${files.length} file(s)…</span>`);const fd=new FormData();fd.append('action','upload');fd.append('token',token);Array.from(files).forEach(f=>fd.append('files',f));try{const res=await fetch(url,{method:'POST',headers:{'X-Api-Token':token},body:fd});const d=await res.json();if(d.error)throw new Error(d.error);let ok=0;(d.results||[]).forEach(r=>{if(r.success){ll(`<span class="l-ok">✓</span> ${r.name}`);ok++;}else ll(`<span class="l-err">✗</span> ${r.name}: ${r.error}`);});toast(ok+' file(s) uploaded','ok');}catch(e){ll(`<span class="l-err">✗ ${esc(e.message)}</span>`);toast('Upload failed','err');}}
+async function uploadToServer(files){if(!files?.length)return;const{url,token}=getApiCfg();if(!url||!token){toast('Configure Server API in Settings first','err');return;}const log=document.getElementById('srv-upload-log');log.className='log-box on';log.innerHTML='';const ll=m=>{log.innerHTML+=`<div>${m}</div>`;log.scrollTop=log.scrollHeight;};ll(`<span class="l-info">Uploading ${files.length} file(s)…</span>`);const fd=new FormData();fd.append('action','upload');fd.append('token',token);Array.from(files).forEach(f=>fd.append('files',f));try{const res=await fetch(url,{method:'POST',headers:authHeaders(),body:fd});const d=await res.json();if(d.error)throw new Error(d.error);let ok=0;(d.results||[]).forEach(r=>{if(r.success){ll(`<span class="l-ok">✓</span> ${r.name}`);ok++;}else ll(`<span class="l-err">✗</span> ${r.name}: ${r.error}`);});toast(ok+' file(s) uploaded','ok');}catch(e){ll(`<span class="l-err">✗ ${esc(e.message)}</span>`);toast('Upload failed','err');}}
 
 // ── BOOTSTRAP ────────────────────────────────────────────────────
 // Toggle delegation for permission toggles in user modals
