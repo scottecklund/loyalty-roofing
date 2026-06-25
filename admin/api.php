@@ -8,14 +8,24 @@
 require_once __DIR__ . '/db.php';      // SQLite data layer (users, sessions, encrypted secrets)
 
 // ── CONFIGURATION ────────────────────────────────────────────────────────────
-define('API_TOKEN',    '44i123');  // SET A STRONG SECRET before deploying — must match Fourge → Settings → Server API token
+// Secrets (API token + Mailgun) are read from config.secret.php when present, so
+// deploying or self-updating api.php NEVER clobbers your live values. The inline
+// strings are only fallbacks for a brand-new install. config.secret.php is
+// gitignored and never deployed — put your real keys there.
+$__secret = (function () {
+    $f = __DIR__ . '/config.secret.php';
+    $c = file_exists($f) ? (include $f) : [];
+    return is_array($c) ? $c : [];
+})();
+
+define('API_TOKEN',    (string)($__secret['api_token'] ?? 'CHANGE_ME')); // optional now (login uses sessions); kept for legacy/external callers
 define('PUBLIC_HTML',  realpath(dirname(__DIR__)));
 
-// Mailgun
-define('MG_DOMAIN',    'mg.example.com');
-define('MG_API_KEY',   '');
-define('MG_FROM',      'Fourge CMS <postmaster@mg.example.com>');
-define('MG_NOTIFY_TO', '');
+// Mailgun (forms)
+define('MG_DOMAIN',    (string)($__secret['mg_domain']    ?? 'mg.example.com'));
+define('MG_API_KEY',   (string)($__secret['mg_api_key']   ?? ''));
+define('MG_FROM',      (string)($__secret['mg_from']      ?? 'Fourge CMS <postmaster@mg.example.com>'));
+define('MG_NOTIFY_TO', (string)($__secret['mg_notify_to'] ?? ''));
 
 // Folders to always exclude from scan (relative paths from public_html root)
 // Add any site-specific paths you want hidden from import
@@ -65,7 +75,7 @@ $action = $body['action'] ?? $_POST['action'] ?? '';
 //  • Legacy file / GA / mail / AI actions accept the shared API_TOKEN OR a
 //    session token, so existing publishing and public form posts keep working.
 $PUBLIC_ACTIONS  = ['login'];
-$SESSION_ACTIONS = ['logout','session','list_users','save_user','delete_user','change_password','get_secrets','set_secret'];
+$SESSION_ACTIONS = ['logout','session','list_users','save_user','delete_user','change_password','get_secrets','set_secret','repo_fetch'];
 
 $apiTok      = $_SERVER['HTTP_X_API_TOKEN'] ?? ($body['token'] ?? ($_POST['token'] ?? ''));
 $hasApiToken = ($apiTok !== '' && hash_equals(API_TOKEN, (string)$apiTok));
@@ -104,6 +114,7 @@ try {
         case 'change_password': ob_end_clean(); fourgeApiChangePassword($authUser, $body); break;
         case 'get_secrets':     ob_end_clean(); fourgeApiGetSecrets($authUser); break;
         case 'set_secret':      ob_end_clean(); fourgeApiSetSecret($authUser, $body); break;
+        case 'repo_fetch':      ob_end_clean(); fourgeApiRepoFetch($authUser, $body); break;
         case 'list_pages':  ob_end_clean(); cmsListPages();    break;
         case 'list_media':  ob_end_clean(); cmsListMedia();    break;
         case 'read_file':   ob_end_clean(); cmsReadFile($body); break;
@@ -301,6 +312,17 @@ function cmsReadFile($body) {
 function cmsWriteFile($body) {
     $relPath = $body['path']    ?? '';
     $content = $body['content'] ?? '';
+    // Content may arrive base64-encoded (content_b64) so the request body gets
+    // past shared-host WAFs that block raw HTML/JS in POSTs. Decode if present.
+    if (isset($body['content_b64']) && is_string($body['content_b64'])) {
+        $decoded = base64_decode($body['content_b64'], true);
+        if ($decoded === false) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid base64 content']);
+            return;
+        }
+        $content = $decoded;
+    }
     $dest    = PUBLIC_HTML . '/' . ltrim($relPath, '/');
     if (gaIsProtectedPath($dest)) {
         http_response_code(403);
@@ -925,4 +947,98 @@ function fourgeApiSetSecret($me, $body) {
         fourgeSetSecret($pdo, $name, $value, $me['username']);
     }
     echo json_encode(['ok' => true]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELF-UPDATE FETCH
+// Fetches a single CMS engine file from the template repo so the browser can
+// write it back to THIS server. Public repos resolve over raw.githubusercontent
+// with no auth; PRIVATE repos use the server-held github_pat via the GitHub
+// Contents API. Locked down: session-only, an explicit path allow-list (never
+// api.php / config.secret.php / site data), and a strict owner/repo shape.
+// ─────────────────────────────────────────────────────────────────────────────
+function fourgeUpdateFetchAllow() {
+    return [
+        'admin/version.json',
+        'admin/index.html',
+        'admin/db.php',
+        'block-renderer.jsx',
+        'blog-post.jsx',
+        'interior-shell.jsx',
+        'posts.jsx',
+        'preview.html',
+    ];
+}
+
+function fourgeApiRepoFetch($me, $body) {
+    $repo   = trim($body['repo'] ?? '');
+    $branch = trim($body['branch'] ?? 'main');
+    if ($branch === '') $branch = 'main';
+    $path   = trim($body['path'] ?? '');
+
+    if (!in_array($path, fourgeUpdateFetchAllow(), true)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'That file is not part of the update set.']);
+        return;
+    }
+    if (!preg_match('~^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*$~', $repo)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Bad repository (expected owner/repo).']);
+        return;
+    }
+    if (!preg_match('~^[A-Za-z0-9][A-Za-z0-9_./-]*$~', $branch)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Bad branch name.']);
+        return;
+    }
+
+    // PRIVATE repos: authenticated GitHub Contents API (raw media type).
+    $pat = null;
+    try { $pat = fourgeGetSecret(fourgeDb(), 'github_pat'); } catch (Throwable $e) { $pat = null; }
+    if ($pat) {
+        $api = "https://api.github.com/repos/{$repo}/contents/" . $path . '?ref=' . rawurlencode($branch);
+        $ch  = curl_init($api);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: token ' . $pat,
+                'Accept: application/vnd.github.raw',
+                'User-Agent: Fourge-CMS-Updater',
+            ],
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_TIMEOUT        => 60,
+        ]);
+        $res  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch);
+        curl_close($ch);
+        if (!$err && $code >= 200 && $code < 300 && $res !== '') {
+            echo json_encode(['ok' => true, 'content' => $res, 'source' => 'api', 'branch' => $branch]);
+            return;
+        }
+        // fall through to public raw on any auth/API hiccup
+    }
+
+    // PUBLIC repos: raw.githubusercontent (no token).
+    $rawUrl = "https://raw.githubusercontent.com/{$repo}/{$branch}/" . $path;
+    $ch = curl_init($rawUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTPHEADER     => ['User-Agent: Fourge-CMS-Updater'],
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_TIMEOUT        => 60,
+    ]);
+    $res  = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
+
+    if ($err) { http_response_code(502); echo json_encode(['error' => 'Repo fetch failed: ' . $err]); return; }
+    if ($code < 200 || $code >= 300) {
+        http_response_code(502);
+        echo json_encode(['error' => 'Repo returned HTTP ' . $code . ' for ' . $path . ($code === 404 ? ' (private repo? set the GitHub PAT in Settings)' : '')]);
+        return;
+    }
+    echo json_encode(['ok' => true, 'content' => $res, 'source' => 'raw', 'branch' => $branch]);
 }
