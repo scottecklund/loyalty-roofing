@@ -557,7 +557,10 @@ code{font-family:var(--font-mono);font-size:11px;background:var(--surface-3);pad
 
 /* ── IMAGE PICKER ──────────────────────────────────────────────── */
 .ve-img-picker-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9100;display:flex;align-items:center;justify-content:center;padding:20px}
-.ve-img-picker-box{background:var(--surface);border-radius:14px;width:100%;max-width:680px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+.ve-img-picker-box{position:relative;background:var(--surface);border-radius:14px;width:100%;max-width:680px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+/* Drag this corner to resize the picker; flex-centering keeps it centered. */
+.ve-img-picker-resize{position:absolute;right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize;z-index:3;touch-action:none}
+.ve-img-picker-resize::after{content:"";position:absolute;right:4px;bottom:4px;width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);opacity:.6}
 .ve-img-picker-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
 .ve-img-picker-head h3{font-size:15px;font-weight:700;color:var(--text)}
 .ve-img-picker-close{background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:4px}
@@ -565,10 +568,10 @@ code{font-family:var(--font-mono);font-size:11px;background:var(--surface-3);pad
 .ve-img-picker-search{flex:1;border:1px solid var(--border);border-radius:7px;padding:7px 11px;font-size:13px;background:var(--bg);color:var(--text)}
 .ve-img-picker-upload-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--ember);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0}
 .ve-img-picker-grid{flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
-.ve-img-picker-item{border-radius:8px;overflow:hidden;border:2px solid transparent;cursor:pointer;background:var(--bg);transition:border-color .12s,transform .12s;aspect-ratio:4/3}
+.ve-img-picker-item{border-radius:8px;overflow:hidden;border:2px solid transparent;cursor:pointer;background:var(--bg);transition:border-color .12s,transform .12s}
 .ve-img-picker-item:hover{border-color:var(--ember);transform:scale(1.02)}
 .ve-img-picker-item.sel{border-color:var(--ember);box-shadow:0 0 0 3px rgba(200,83,30,.2)}
-.ve-img-picker-item img{width:100%;height:100%;object-fit:cover;display:block}
+.ve-img-picker-item img{width:100%;height:150px;object-fit:contain;display:block;background:var(--bg-2)}
 .ve-img-picker-item-name{font-size:10px;color:var(--muted);padding:4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--surface)}
 .ve-img-picker-empty{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;color:var(--muted);text-align:center;gap:10px;font-size:13px}
 .ve-img-picker-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
@@ -5973,12 +5976,48 @@ async function veOpenImgPicker(){
           <button class="fd-btn-secondary" onclick="document.getElementById('ve-img-picker-modal').style.display='none'">Cancel</button>
           <button class="ve-apply-btn" style="margin:0;padding:9px 20px" onclick="vePickerApply()">Use Image</button>
         </div>
+        <div class="ve-img-picker-resize" title="Drag to resize" onpointerdown="veImgPickerResizeStart(event)"></div>
       </div>`;
     modal.addEventListener('click', e=>{ if(e.target===modal) modal.style.display='none'; });
     document.body.appendChild(modal);
   }
+  // Restore a previously dragged size (kept centred by the flex overlay).
+  try{
+    const s=JSON.parse(localStorage.getItem('cd_vip_size')||'null');
+    if(s&&s.w){ const box=modal.querySelector('.ve-img-picker-box'); if(box){ box.style.maxWidth='none'; box.style.maxHeight='none'; box.style.width=s.w+'px'; box.style.height=s.h+'px'; } }
+  }catch{}
   modal.style.display='flex';
   veRenderImgPicker();
+}
+
+// Drag the corner grip to resize the picker. The overlay flex-centers the box,
+// so growing width/height by 2×delta keeps it centred and the grip under the
+// cursor. Size is remembered across opens.
+let _vipResize=null;
+function veImgPickerResizeStart(e){
+  e.preventDefault(); e.stopPropagation();
+  const box=document.querySelector('#ve-img-picker-modal .ve-img-picker-box');
+  if(!box) return;
+  const r=box.getBoundingClientRect();
+  _vipResize={x:e.clientX,y:e.clientY,w:r.width,h:r.height};
+  box.style.maxWidth='none'; box.style.maxHeight='none';
+  window.addEventListener('pointermove',veImgPickerResizeMove);
+  window.addEventListener('pointerup',veImgPickerResizeEnd,{once:true});
+}
+function veImgPickerResizeMove(e){
+  if(!_vipResize) return;
+  const box=document.querySelector('#ve-img-picker-modal .ve-img-picker-box');
+  if(!box) return;
+  const maxW=window.innerWidth*0.96, maxH=window.innerHeight*0.96;
+  const w=Math.max(360,Math.min(maxW,_vipResize.w+(e.clientX-_vipResize.x)*2));
+  const h=Math.max(320,Math.min(maxH,_vipResize.h+(e.clientY-_vipResize.y)*2));
+  box.style.width=w+'px'; box.style.height=h+'px';
+}
+function veImgPickerResizeEnd(){
+  window.removeEventListener('pointermove',veImgPickerResizeMove);
+  const box=document.querySelector('#ve-img-picker-modal .ve-img-picker-box');
+  if(box){ try{ localStorage.setItem('cd_vip_size',JSON.stringify({w:Math.round(parseFloat(box.style.width)),h:Math.round(parseFloat(box.style.height))})); }catch{} }
+  _vipResize=null;
 }
 
 async function veLoadMediaLib(){
@@ -6035,7 +6074,7 @@ function veRenderImgPicker(filter=''){
   }
   grid.innerHTML = items.map((m,i)=>`
     <div class="ve-img-picker-item${_imgPickerSel===m.url?' sel':''}" onclick="vePickerSelect('${esc(m.url)}',this)" title="${esc(m.name)}">
-      <img src="${esc(m.url)}" loading="lazy" onerror="this.parentElement.style.display='none'" style="width:100%;height:90px;object-fit:cover;display:block">
+      <img src="${esc(m.url)}" loading="lazy" onerror="this.parentElement.style.display='none'" style="width:100%;height:150px;object-fit:contain;display:block;background:var(--bg-2)">
       <div class="ve-img-picker-item-name">${esc(m.name)}</div>
     </div>`).join('');
 }
@@ -6540,18 +6579,25 @@ function authHeaders(extra){
 // UTF-8-safe base64 (matches the GitHub write encoding).
 function b64EncodeUnicode(str){ return btoa(unescape(encodeURIComponent(String(str)))); }
 async function apiCall(action,body={}){
+  // Page saves (write_file) carry a full HTML document. A JSON POST of that
+  // gets 404'd by many shared-host WAFs, which flag HTML/JS in the body — but
+  // multipart file uploads sail right through (that's how the Media Library
+  // works). So send write_file as multipart/form-data with the content as a
+  // file part: the exact channel image uploads already use successfully.
+  if(action==='write_file' && typeof body.content==='string'){
+    const fd=new FormData();
+    fd.append('action','write_file');
+    fd.append('path', body.path||'');
+    fd.append('content_file', new Blob([body.content],{type:'text/plain'}), 'content.txt');
+    const res=await fetch(getApiBase(),{method:'POST',headers:authHeaders(),body:fd});
+    let d=null; try{ d=await res.json(); }catch(e){ throw new Error('Server returned an invalid response ('+res.status+')'); }
+    if(d&&d.error){ const err=new Error(d.error); err.status=res.status; throw err; }
+    return d;
+  }
   const headers={'Content-Type':'application/json'};
   const stok=getToken();                       if(stok) headers['X-Session-Token']=stok; // session auth (login)
   const atok=localStorage.getItem('cd_api_token'); if(atok) headers['X-Api-Token']=atok;  // legacy shared token (file ops)
   const payload={action,...body}; if(atok) payload.token=atok;
-  // Many shared hosts run a WAF that blocks POST bodies containing raw HTML/JS,
-  // so saving a page 404s before it ever reaches PHP. Send file content
-  // base64-encoded (content_b64) to keep the body opaque; api.php decodes it.
-  // Covers every write_file caller (page save, revisions, pages.json, etc.).
-  if(action==='write_file' && typeof payload.content==='string'){
-    payload.content_b64 = b64EncodeUnicode(payload.content);
-    delete payload.content;
-  }
   const res=await fetch(getApiBase(),{method:'POST',headers,body:JSON.stringify(payload)});
   let d=null; try{ d=await res.json(); }catch(e){ throw new Error('Server returned an invalid response ('+res.status+')'); }
   if(d&&d.error){ const err=new Error(d.error); err.status=res.status; throw err; }
